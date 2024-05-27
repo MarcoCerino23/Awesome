@@ -4,16 +4,16 @@ import { ref, push, onValue, set as firebaseSet, remove } from 'firebase/databas
 import { getAuth } from 'firebase/auth';
 import { FIREBASE_DB } from './firebaseConfig';
 
-function Chat() {
+function ChatScreen({ route }) {
+  const { userId, userName } = route.params;
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const auth = getAuth();
-  const userId = auth.currentUser?.uid;
-  const trainerId = 'XRo7JkvYb0gIfzRtmVX0wWKBN853';
+  const trainerId = auth.currentUser?.uid; // Assuming trainer is the logged-in user
 
   useEffect(() => {
-    if (!userId) {
-      console.error("User ID not found, user might not be logged in.");
+    if (!trainerId) {
+      console.error("Trainer ID not found, trainer might not be logged in.");
       return;
     }
 
@@ -39,19 +39,20 @@ function Chat() {
   }, [userId, trainerId]);
 
   const sendMessage = async () => {
-    if (!userId || !input.trim()) {
+    if (!trainerId || !input.trim()) {
       return;
     }
     const chatPath = `chats/${userId}_${trainerId}/messages`;
     const newMessageRef = push(ref(FIREBASE_DB, chatPath));
     const newMessage = {
       text: input,
-      sender_id: userId,
-      receiver_id: trainerId,
+      sender_id: trainerId,
+      receiver_id: userId,
       timestamp: new Date().toISOString()
     };
 
     await firebaseSet(newMessageRef, newMessage);
+    newMessage.id = newMessageRef.key;
 
     setMessages(prevMessages => {
       const newMessageWithId = { ...newMessage, id: newMessageRef.key };
@@ -68,16 +69,13 @@ function Chat() {
   };
 
   const deleteMessage = async (messageId) => {
-    if (!userId) {
-      return;
-    }
     const chatPath = `chats/${userId}_${trainerId}/messages/${messageId}`;
     await remove(ref(FIREBASE_DB, chatPath));
 
     setMessages(prevMessages => prevMessages.filter(message => message.id !== messageId));
   };
 
-  const isMyMessage = (item) => item.sender_id === userId;
+  const isMyMessage = (item) => item.sender_id === trainerId;
 
   return (
     <View style={styles.container}>
@@ -121,7 +119,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 20,
     backgroundColor: '#f0f0f0',
     borderTopWidth: 1,
     borderTopColor: '#cccccc',
@@ -168,8 +166,16 @@ const styles = StyleSheet.create({
   myMessageText: {
     color: '#ffffff',
   },
+  deleteButton: {
+    marginTop: 5,
+    alignSelf: 'flex-end',
+    backgroundColor: '#ff3b30',
+    padding: 5,
+    borderRadius: 5,
+  },
+  deleteButtonText: {
+    color: '#ffffff',
+  },
 });
 
-export default Chat;
-
-
+export default ChatScreen;
