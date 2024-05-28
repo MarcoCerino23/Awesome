@@ -1,8 +1,8 @@
-
 import { initializeApp } from "firebase/app";
-import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth"; // Importa le funzioni necessarie per l'autenticazione
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage'; // Importa AsyncStorage
+import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth";
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { getDatabase } from "firebase/database";
+import { getStorage } from "firebase/storage"; // Import Firebase storage
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -18,13 +18,12 @@ const firebaseConfig = {
 
 const FIREBASE_APP = initializeApp(firebaseConfig);
 
-// Inizializza Firebase Auth con persistenza tramite AsyncStorage
+// Initialize Firebase Auth with persistence via AsyncStorage
 const FIREBASE_AUTH = initializeAuth(FIREBASE_APP, {
   persistence: getReactNativePersistence(ReactNativeAsyncStorage)
 });
 
-const FIREBASE_DB = getDatabase(FIREBASE_APP); // Ottieni l'istanza del Realtime Database
+const FIREBASE_DB = getDatabase(FIREBASE_APP); // Get instance of the Realtime Database
+const FIREBASE_STORAGE = getStorage(FIREBASE_APP); // Initialize Firebase Storage
 
-export { FIREBASE_APP, FIREBASE_AUTH, FIREBASE_DB};
-
-
+export { FIREBASE_APP, FIREBASE_AUTH, FIREBASE_DB, FIREBASE_STORAGE };
