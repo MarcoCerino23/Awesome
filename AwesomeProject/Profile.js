@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Alert, Button, Image } from 'react-native';
 import { onAuthStateChanged } from "firebase/auth";
 import { ref, set, get } from "firebase/database";
-import { getDownloadURL, uploadBytes, ref as storageRef } from "firebase/storage";
+import { getDownloadURL, ref as storageRef, uploadBytesResumable } from "firebase/storage";
 import * as ImagePicker from 'expo-image-picker';
 import { FIREBASE_DB, FIREBASE_AUTH, FIREBASE_STORAGE } from './firebaseConfig';
 
@@ -17,45 +17,49 @@ export default function Profile() {
         forearm: '',
         calf: ''
     });
-
     const [user, setUser] = useState(null);
     const [image, setImage] = useState(null);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, currentUser => {
+        const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, async currentUser => {
+            console.log("Current user UID:", currentUser ? currentUser.uid : "No user logged in");
             setUser(currentUser);
             if (currentUser) {
                 const userRef = ref(FIREBASE_DB, 'users/' + currentUser.uid + '/measurements');
-                get(userRef).then((snapshot) => {
+                try {
+                    const snapshot = await get(userRef);
                     if (snapshot.exists()) {
                         setMeasurements(snapshot.val());
                     } else {
                         console.log("No data available");
                     }
-                }).catch((error) => {
+                } catch (error) {
                     console.error("Error fetching measurements:", error);
-                });
+                }
 
-                const imageRef = storageRef(FIREBASE_STORAGE, 'profileImages/' + currentUser.uid);
-                getDownloadURL(imageRef).then((url) => {
+                try {
+                    const url = await getDownloadURL(storageRef(FIREBASE_STORAGE, 'profileImages/' + currentUser.uid));
                     setImage(url);
-                }).catch((error) => {
+                } catch (error) {
                     if (error.code === 'storage/object-not-found') {
                         console.log("Image not found, skipping download URL retrieval.");
                     } else {
                         console.error("Error getting download URL:", error);
                     }
-                });
+                }
             }
         });
-        return () => unsubscribe(); // Cleanup subscription on unmount
+        return () => unsubscribe();
     }, []);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (user) {
             const userRef = ref(FIREBASE_DB, 'users/' + user.uid + '/measurements');
-            set(userRef, measurements)
-                .catch(error => Alert.alert('Error', error.message));
+            try {
+                await set(userRef, measurements);
+            } catch (error) {
+                Alert.alert('Error', error.message);
+            }
         } else {
             Alert.alert('Error', 'No user logged in!');
         }
@@ -73,6 +77,12 @@ export default function Profile() {
     };
 
     const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Sorry, we need camera roll permissions to make this work!');
+            return;
+        }
+
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
@@ -80,23 +90,39 @@ export default function Profile() {
             quality: 1,
         });
 
-        if (!result.cancelled) {
-            try {
-                console.log("Image selected:", result.uri);
-                const response = await fetch(result.uri);
-                console.log("Response fetched:", response);
-                const blob = await response.blob();
-                console.log("Blob created:", blob);
-                const imageRef = storageRef(FIREBASE_STORAGE, 'profileImages/' + user.uid);
-                await uploadBytes(imageRef, blob);
-                console.log("Image uploaded successfully");
-                const url = await getDownloadURL(imageRef);
-                setImage(url);
-                console.log("Image URL:", url);
-            } catch (error) {
-                console.error("Error uploading or getting download URL:", error);
-                Alert.alert('Error', 'Failed to upload image or get URL.');
-            }
+        if (result.canceled || !result.assets || result.assets.length === 0) {
+            console.log("Image selection canceled or no assets");
+            return;
+        }
+
+        const uri = result.assets[0].uri;
+        console.log("ImagePicker result:", result);
+        console.log("Image selected:", uri);
+
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const imageRef = storageRef(FIREBASE_STORAGE, 'profileImages/' + user.uid);
+            const uploadTask = uploadBytesResumable(imageRef, blob);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // Progress monitoring
+                    console.log('Upload is ' + (snapshot.bytesTransferred / snapshot.totalBytes) * 100 + '% done');
+                },
+                (error) => {
+                    console.error("Error during image upload:", error);
+                    Alert.alert('Error', 'Failed to upload image: ' + error.message);
+                },
+                async () => {
+                    const url = await getDownloadURL(uploadTask.snapshot.ref);
+                    setImage(url);
+                    console.log("Download URL retrieved:", url);
+                }
+            );
+        } catch (error) {
+            console.error("Error during image upload and retrieval:", error);
+            Alert.alert('Error', 'Failed to upload image or retrieve download URL: ' + error.message);
         }
     };
 
@@ -110,7 +136,7 @@ export default function Profile() {
                         onChangeText={(text) => handleChange(key, text)}
                         value={measurements[key]}
                         keyboardType="numeric"
-                        onBlur={handleBlur}  // Save data when the input loses focus
+                        onBlur={handleBlur}
                     />
                 </View>
             ))}
@@ -133,7 +159,6 @@ const styles = StyleSheet.create({
     input: {
         height: 40,
         borderWidth: 1,
-        marginBottom: 8,
         padding: 10
     },
     label: {
