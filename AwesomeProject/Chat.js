@@ -9,7 +9,7 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const auth = getAuth();
   const userId = auth.currentUser?.uid;
-  const trainerId = 'w8TxS0wRBQYfIi0hDKdmdwLqmjC2';
+  const trainerId = 'XRo7JkvYb0gIfzRtmVX0wWKBN853';
 
   useEffect(() => {
     if (!userId) {

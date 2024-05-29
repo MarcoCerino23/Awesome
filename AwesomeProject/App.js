@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import LoginForm from './LoginForm';
 import SignUpForm from './SignUpForm';
 import HomePage from './HomePage';
@@ -11,9 +12,10 @@ import Profile from './Profile';
 import Chat from './Chat';
 import SeriesDetails from './SeriesDetails';
 import ExerciseDetail from './ExerciseDetail';
-import Icon from 'react-native-vector-icons/Ionicons'; // Assicurati di importare la famiglia di icone desiderata
+import Icon from 'react-native-vector-icons/Ionicons';
 import ChatList from './ChatList';
-import CreateWorkout from './CreateWorkout';
+
+import CreateWorkout from './CreateWorkout'
 import WorkoutDetails from './WorkoutDetails';
 import UsersList from './UsersList';  // Nuova schermata per la lista degli utenti
 import UserProfile from './UserProfile';  // Schermata per visualizzare il profilo dell'utente
@@ -23,11 +25,10 @@ import { onAuthStateChanged } from "firebase/auth";
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Funzione per verificare se l'utente è l'istruttore
-const isInstructor = (email) => email === 'matamattia@gmail.com';
-
 // Componente per i tab della home
-function HomeTabs({ user }) {
+
+
+function HomeTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -56,9 +57,6 @@ function HomeTabs({ user }) {
       <Tab.Screen name="Exercises" component={Exercises} options={{ title: 'Esercizi' }} />
       <Tab.Screen name="Profile" component={Profile} options={{ title: 'Profilo' }} />
       <Tab.Screen name="Chat" component={Chat} options={{ title: 'Chat' }} />
-      {isInstructor(user.email) && (
-        <Tab.Screen name="Users" component={UsersList} options={{ title: 'Utenti' }} />
-      )}
       <Tab.Screen name="ChatList" component={ChatList} options={{ title: 'ChatList' }} />
     </Tab.Navigator>
   );
@@ -69,7 +67,6 @@ function HomeTabsWrapper({ user }) {
   return <HomeTabs user={user} />;
 }
 
-// Navigatore principale dell'app
 function App() {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
@@ -87,26 +84,18 @@ function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
-        {!user ? (
-          <>
-            <Stack.Screen name="Login" component={LoginForm} options={{ headerShown: false }} />
-            <Stack.Screen name="SignUp" component={SignUpForm} options={{ headerShown: false }} />
-          </>
-        ) : (
-          <>
-            <Stack.Screen 
-              name="Home" 
-              options={{ headerShown: false }}
-            >
-              {props => <HomeTabsWrapper {...props} user={user} />}
-            </Stack.Screen>
-            <Stack.Screen name="ExerciseDetail" component={ExerciseDetail} options={{ title: 'Details' }} />
-            <Stack.Screen name="CreateWorkout" component={CreateWorkout} options={{ title: 'Create Workout' }} />
-            <Stack.Screen name="WorkoutDetails" component={WorkoutDetails} options={{ title: 'Workout Details' }} />
-            <Stack.Screen name="SeriesDetails" component={SeriesDetails} options={{ title: 'SeriesDetails' }} />
-            <Stack.Screen name="UserProfile" component={UserProfile} options={{ title: 'User Profile' }} />
-          </>
-        )}
+        <Stack.Screen name="Login" component={LoginForm} options={{ headerShown: false }} />
+        <Stack.Screen name="SignUp" component={SignUpForm} options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="Home" 
+          component={HomeTabs} 
+          options={{ headerShown: false }}  // Nasconde l'intestazione nel Tab Navigator
+        />
+        <Stack.Screen name="ExerciseDetail" component={ExerciseDetail} options={{ title: 'Details' }} />
+        <Stack.Screen name="CreateWorkout" component={CreateWorkout} options={{ title: 'Create Workout' }} />
+        <Stack.Screen name="WorkoutDetails" component={WorkoutDetails} options={{ title: 'Workout Details' }} />
+        <Stack.Screen name="SeriesDetails" component={SeriesDetails} options={{ title: 'SeriesDetails' }} />
+
       </Stack.Navigator>
     </NavigationContainer>
   );

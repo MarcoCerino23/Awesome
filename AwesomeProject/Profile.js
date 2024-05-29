@@ -1,10 +1,19 @@
 
 import React, { useState, useEffect } from 'react';
+<<<<<<< HEAD
 import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { onAuthStateChanged } from "firebase/auth";
 import { ref, set, push, onValue, update, remove } from "firebase/database";
 import { FIREBASE_DB, FIREBASE_AUTH } from './firebaseConfig';
 import Icon from 'react-native-vector-icons/FontAwesome5'; // Assicurati di avere installato questo pacchetto
+=======
+import { View, Text, TextInput, StyleSheet, ScrollView, Alert, Button, Image } from 'react-native';
+import { onAuthStateChanged } from "firebase/auth";
+import { ref, set, get } from "firebase/database";
+import { getDownloadURL, ref as storageRef, uploadBytesResumable } from "firebase/storage";
+import * as ImagePicker from 'expo-image-picker';
+import { FIREBASE_DB, FIREBASE_AUTH, FIREBASE_STORAGE } from './firebaseConfig';
+>>>>>>> origin/cre
 
 export default function Profile() {
     const [user, setUser] = useState(null);
@@ -23,29 +32,71 @@ export default function Profile() {
         wrist: '',
         glutes: ''
     });
+<<<<<<< HEAD
     const [editingMeasurement, setEditingMeasurement] = useState(null);
     const [expandedMeasurements, setExpandedMeasurements] = useState({});
+=======
+    const [user, setUser] = useState(null);
+    const [image, setImage] = useState(null);
+>>>>>>> origin/cre
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, currentUser => {
+        const unsubscribe = onAuthStateChanged(FIREBASE_AUTH, async currentUser => {
+            console.log("Current user UID:", currentUser ? currentUser.uid : "No user logged in");
             setUser(currentUser);
             if (currentUser) {
+<<<<<<< HEAD
                 const userMeasurementsRef = ref(FIREBASE_DB, `users/${currentUser.uid}/measurements`);
                 onValue(userMeasurementsRef, (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
                         setMeasurements(Object.entries(data));
+=======
+                const userRef = ref(FIREBASE_DB, 'users/' + currentUser.uid + '/measurements');
+                try {
+                    const snapshot = await get(userRef);
+                    if (snapshot.exists()) {
+                        setMeasurements(snapshot.val());
+>>>>>>> origin/cre
                     } else {
                         setMeasurements([]);
                     }
+<<<<<<< HEAD
                 });
+=======
+                } catch (error) {
+                    console.error("Error fetching measurements:", error);
+                }
+
+                try {
+                    const url = await getDownloadURL(storageRef(FIREBASE_STORAGE, 'profileImages/' + currentUser.uid));
+                    setImage(url);
+                } catch (error) {
+                    if (error.code === 'storage/object-not-found') {
+                        console.log("Image not found, skipping download URL retrieval.");
+                    } else {
+                        console.error("Error getting download URL:", error);
+                    }
+                }
+>>>>>>> origin/cre
             }
         });
         return () => unsubscribe();
     }, []);
 
     const handleSave = async () => {
+<<<<<<< HEAD
         if (!user) {
+=======
+        if (user) {
+            const userRef = ref(FIREBASE_DB, 'users/' + user.uid + '/measurements');
+            try {
+                await set(userRef, measurements);
+            } catch (error) {
+                Alert.alert('Error', error.message);
+            }
+        } else {
+>>>>>>> origin/cre
             Alert.alert('Error', 'No user logged in!');
             return;
         }
@@ -132,6 +183,56 @@ export default function Profile() {
         setShowForm(true);
     };
 
+    const pickImage = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Sorry, we need camera roll permissions to make this work!');
+            return;
+        }
+
+        let result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 1,
+        });
+
+        if (result.canceled || !result.assets || result.assets.length === 0) {
+            console.log("Image selection canceled or no assets");
+            return;
+        }
+
+        const uri = result.assets[0].uri;
+        console.log("ImagePicker result:", result);
+        console.log("Image selected:", uri);
+
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+            const imageRef = storageRef(FIREBASE_STORAGE, 'profileImages/' + user.uid);
+            const uploadTask = uploadBytesResumable(imageRef, blob);
+
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // Progress monitoring
+                    console.log('Upload is ' + (snapshot.bytesTransferred / snapshot.totalBytes) * 100 + '% done');
+                },
+                (error) => {
+                    console.error("Error during image upload:", error);
+                    Alert.alert('Error', 'Failed to upload image: ' + error.message);
+                },
+                async () => {
+                    const url = await getDownloadURL(uploadTask.snapshot.ref);
+                    setImage(url);
+                    console.log("Download URL retrieved:", url);
+                }
+            );
+        } catch (error) {
+            console.error("Error during image upload and retrieval:", error);
+            Alert.alert('Error', 'Failed to upload image or retrieve download URL: ' + error.message);
+        }
+    };
+
     return (
         <View style={styles.container}>
             {!showForm && (
@@ -147,6 +248,7 @@ export default function Profile() {
                         value={editingMeasurement ? editingMeasurement.weight : newMeasurement.weight}
                         placeholder="Weight (kg)"
                         keyboardType="numeric"
+<<<<<<< HEAD
                     />
                     <TextInput
                         style={styles.input}
@@ -251,6 +353,17 @@ export default function Profile() {
                 ))}
             </ScrollView>
         </View>
+=======
+                        onBlur={handleBlur}
+                    />
+                </View>
+            ))}
+            <View style={styles.imagePickerContainer}>
+                {image && <Image source={{ uri: image }} style={styles.image} />}
+                <Button title="Pick an image from gallery" onPress={pickImage} />
+            </View>
+        </ScrollView>
+>>>>>>> origin/cre
     );
 }
 
@@ -282,6 +395,7 @@ const styles = StyleSheet.create({
         height: 40,
         borderColor: 'gray',
         borderWidth: 1,
+<<<<<<< HEAD
         marginBottom: 10,
         paddingLeft: 10
     },
@@ -298,6 +412,23 @@ const styles = StyleSheet.create({
     },
     measurementDetails: {
         marginTop: 10
+=======
+        padding: 10
+    },
+    label: {
+        fontSize: 16,
+        marginBottom: 5
+    },
+    imagePickerContainer: {
+        alignItems: 'center',
+        marginVertical: 20
+    },
+    image: {
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        marginBottom: 10
+>>>>>>> origin/cre
     }
 });
 
