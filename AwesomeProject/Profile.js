@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     },
     imagePickerContainer: {
         alignItems: 'center',
-        marginVertical: 30
+        marginVertical: 20
     },
     image: {
         width: 200,
