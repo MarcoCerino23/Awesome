@@ -1,17 +1,55 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import {
-  View, SafeAreaView, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert
+  View,
+  SafeAreaView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  Alert,
 } from 'react-native';
-import { ref, push, set } from "firebase/database";
+import { ref, push, set, onValue } from "firebase/database";
 import { FIREBASE_DB } from './firebaseConfig';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { exercisesData } from './Exercises';
-import { getAuth } from "firebase/auth";
+import { Picker } from '@react-native-picker/picker';
+
 function CreateWorkout({ navigation }) {
     const [workoutName, setWorkoutName] = useState('');
     const [selectedExercises, setSelectedExercises] = useState([]);
-    
+    const [users, setUsers] = useState([]);
+    const [filteredUsers, setFilteredUsers] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState(null);
+    const [searchText, setSearchText] = useState('');
+
+    useEffect(() => {
+        const usersRef = ref(FIREBASE_DB, 'users');
+        onValue(usersRef, snapshot => {
+            const userData = snapshot.val();
+            const userList = Object.keys(userData).map(key => ({
+                id: key,
+                name: `${userData[key].firstName} ${userData[key].lastName}`
+            }));
+            setUsers(userList);
+            setFilteredUsers(userList); // Inizializza anche gli utenti filtrati
+        });
+    }, []);
+
+    const handleSearch = (text) => {
+        setSearchText(text);
+        if (text === '') {
+            setFilteredUsers(users); // Se non c'è testo, mostra tutti gli utenti
+        } else {
+            const filtered = users.filter(user => 
+                user.name.toLowerCase().includes(text.toLowerCase())
+            );
+            setFilteredUsers(filtered);
+        }
+    };
+
     const handleAddExercise = exercise => {
         const existing = selectedExercises.find(e => e.id === exercise.id);
         if (!existing) {
@@ -29,40 +67,36 @@ function CreateWorkout({ navigation }) {
         setSelectedExercises(updatedExercises);
     };
 
-    
+    const handleSaveWorkout = async () => {
+        if (!selectedUserId) {
+            Alert.alert('Error', 'Please select a user.');
+            return;
+        }
+        if (!workoutName.trim()) {
+            Alert.alert('Error', 'Please enter a workout name.');
+            return;
+        }
+        const workoutPath = `workouts/${selectedUserId}`;
+        const newWorkoutRef = push(ref(FIREBASE_DB, workoutPath));
+        const workoutData = {
+            name: workoutName,
+            exercises: selectedExercises.map(ex => ({
+                id: ex.id,
+                title: ex.title,
+                sets: ex.sets,
+                reps: ex.reps,
+                rest: ex.rest
+            }))
+        };
 
-const handleSaveWorkout = async () => {
-    const userId = getAuth().currentUser.uid; // Ottieni l'ID dell'utente corrente
-    const workoutPath = `workouts/${userId}`; // Crea il percorso del database specifico per l'utente
-
-    if (!workoutName.trim()) {
-        Alert.alert('Error', 'Please enter a workout name.');
-        return;
-    }
-
-    const newWorkoutRef = push(ref(FIREBASE_DB, workoutPath));
-
-    const workoutData = {
-        name: workoutName,
-        exercises: selectedExercises.map(ex => ({
-            id: ex.id,
-            title: ex.title,
-            sets: ex.sets,
-            reps: ex.reps,
-            rest: ex.rest
-        }))
+        try {
+            await set(newWorkoutRef, workoutData);
+            Alert.alert('Success', 'Workout saved successfully!');
+            navigation.goBack();
+        } catch (error) {
+            Alert.alert('Error', 'Failed to save workout.');
+        }
     };
-
-    try {
-        await set(newWorkoutRef, workoutData);
-        Alert.alert('Success', 'Workout saved successfully!');
-        navigation.goBack();
-    } catch (error) {
-        Alert.alert('Error', 'Failed to save workout.');
-    }
-};
-
-    
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -72,6 +106,20 @@ const handleSaveWorkout = async () => {
                 </TouchableOpacity>
                 <Text style={styles.screenTitle}>Create Workout</Text>
             </View>
+            <TextInput
+                style={styles.searchBar}
+                placeholder="Search Users..."
+                onChangeText={handleSearch}
+                value={searchText}
+            />
+            <Picker
+                selectedValue={selectedUserId}
+                onValueChange={(itemValue, itemIndex) => setSelectedUserId(itemValue)}
+                style={styles.picker}>
+                {filteredUsers.map(user => (
+                    <Picker.Item key={user.id} label={user.name} value={user.id} />
+                ))}
+            </Picker>
             <TextInput
                 style={styles.inputName}
                 placeholder="Workout Name"
@@ -123,6 +171,24 @@ const styles = StyleSheet.create({
     screenTitle: {
         fontSize: 22,
         fontWeight: 'bold',
+    },
+    searchBar: {
+        fontSize: 16,
+        height: 50,
+        marginHorizontal: 20,
+        marginVertical: 10,
+        paddingHorizontal: 10,
+        borderRadius: 25,
+        backgroundColor: '#ffffff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
+    },
+    picker: {
+        marginHorizontal: 20,
+        marginBottom: 20,
     },
     inputName: {
         fontSize: 16,
@@ -193,8 +259,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: '#ffffff',
         fontWeight: 'bold',
-    }
+    },
 });
 
 export default CreateWorkout;
-
